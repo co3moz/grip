@@ -1,0 +1,248 @@
+<!-- co3moz - grip gravity space stuff - for fun :) -->
+<title> Grip - Lame Universe </title>
+<canvas id="grip">
+
+</canvas>
+
+<style>
+	body {
+		background-color: black;
+	}
+</style>
+
+<script>
+	var grip = document.getElementById('grip');
+	var ctx = grip.getContext('2d');
+	var w = grip.width;
+	var h = grip.height;
+	var cam = {x: w / 2, y:  h / 2, focus: null};
+	var lastRender = Date.now();
+	var objs = [];
+	
+	var setting = {
+	
+	};
+	
+	function changeSize(nw, nh) {
+		w = grip.width = nw;
+		h = grip.height = nh;
+	}
+	
+
+	function render(objs) {
+		ctx.fillStyle="black";
+		ctx.fillRect(0, 0, w, h);
+
+		ctx.strokeStyle = "rgb(20, 20, 20)";
+		var t = w / 50;
+		for(var x = 1; x < t + 1; x++) {
+			ctx.beginPath();
+			var k = (w / t * x - cam.x) % w;
+			if(k < 0) {
+				k += w;
+			}
+			ctx.moveTo(k, 0);
+			ctx.lineTo(k, h);
+			ctx.stroke();
+		}
+		
+		t = h / 50;
+		for(var x = 1; x < t + 1; x++) {
+			var k = (h / t * x - cam.y) % h;
+			if(k < 0) {
+				k += h;
+			}
+			
+			ctx.moveTo(0, k);
+			ctx.lineTo(w, k);
+			ctx.stroke();
+		}
+		
+		
+		
+		objs.forEach(function(o) {
+			if(o.mass < 10) {
+				ctx.fillStyle = 'white';
+			} else if(o.mass < 50) {
+				ctx.fillStyle = 'lime';
+			} else if(o.mass < 250) {
+				ctx.fillStyle = 'blue';
+			} else if(o.mass < 1000) {
+				ctx.fillStyle = 'red';
+			} else {
+				ctx.fillStyle = 'darkred';
+			}
+			ctx.beginPath();
+			ctx.arc(o.x - cam.x + w / 2, o.y - cam.y + h / 2, Math.sqrt(o.mass), 0, 2 * Math.PI);
+			ctx.fill();
+		});
+		
+		
+		ctx.font = '10px monospace';
+		ctx.fillStyle = 'white';
+		if (cam.focus) {
+			ctx.fillText("total= " + objs.length + "\nfps=" + (1000 / (Date.now() - lastRender)).toFixed(0) +"\n{x:" + cam.x.toFixed(0) + ", y:" + cam.y.toFixed(0) + ", mass:" + cam.focus.mass.toFixed(0) + ", vel: {x:" + cam.focus.vel.x.toFixed(2) +", y:" + cam.focus.vel.y.toFixed(2) +"}, force: {x:" + cam.focus.force.x.toExponential(3) +", y:" + cam.focus.force.y.toExponential(3) +"}}", 10, 10);
+		} else {
+			ctx.fillText("total= " + objs.length + "\nfps=" + (1000 / (Date.now() - lastRender)).toFixed(0) +"\n{x:" + cam.x.toFixed(0) + ", y:" + cam.y.toFixed(0) + "}", 10, 10);
+		}
+		
+		
+		ctx.fillText(Object.keys(setting).join(', '), 10, 25);
+		
+		ctx.font = '48px monospace';
+		ctx.fillStyle = 'green';
+		ctx.fillText("Grip - Lame Universe", w / 2 - cam.x - 250, h / 2 - 90 - cam.y)
+		
+		
+		lastRender = Date.now();
+	}
+	
+	function gravity(objs) {
+		setting.gravity = true;
+		objs.forEach(function(o) {
+			o.force = {x: 0, y:0};
+			objs.forEach(function(a) {
+				if(o == a) return;
+				var force = o.mass * a.mass / (Math.pow(a.x - o.x, 2) + Math.pow(a.y - o.y, 2));
+				var forceX = force * Math.cos(Math.atan2(a.y - o.y, a.x - o.x));
+				var forceY = force * Math.sin(Math.atan2(a.y - o.y, a.x - o.x));
+				o.force.x += forceX;
+				o.force.y += forceY;
+			});
+		});
+	}
+	
+	function executeForce(objs) {
+		setting.executeForce = true;
+		objs.forEach(function(o) {
+			if (!o.vel) {
+				o.vel = {x: 0, y: 0};
+			}
+			
+			o.vel.x += o.force.x;
+			o.vel.y += o.force.y;
+		});
+	}
+	
+	function executeVelocity(objs) {
+		setting.executeVelocity = true;
+		objs.forEach(function(o) {
+			o.x += o.vel.x;
+			o.y += o.vel.y;
+		});
+	}
+	
+	function spaceFriction(objs) { // yeah. :D
+		setting.spaceFriction = true;
+		objs.forEach(function(o) {
+			o.vel.x *= 0.99;
+			o.vel.y *= 0.99;
+		});
+	}
+	
+	function checkCollision(objs) {
+		setting.checkCollision = true;
+		objs.forEach(function(o) {
+			objs.forEach(function(a) {
+				if(o == a) return;
+				if(o.mass < a.mass) return;
+				if (Math.pow(a.x - o.x, 2) + Math.pow(a.y - o.y, 2) < o.mass) {
+					o.mass += a.mass;
+					a.mass = 0;
+				}
+			});
+		});
+	}
+	
+	function focus() {
+		if(cam.focus) {
+			cam.x = cam.focus.x;
+			cam.y = cam.focus.y;
+		}
+	}
+	
+	function focusBiggest(objs) {
+		setting.focusBiggest = true;
+		var big = objs[0];
+		objs.forEach(function(o) {
+			if (big == o) return;
+			if (big.mass < o.mass) {
+				big = o;
+			}
+		});
+		
+		cam.focus = big;
+	}
+	
+	function randomShit(objs, count) {
+		for(var i = 0; i < count; i++) {
+			objs.push({
+				x: Math.random() * 500 - 250,
+				y: Math.random() * 500 - 250,
+				mass: Math.random() * 5 + 1
+			});
+		}
+	}
+	
+	
+	function gridShit(objs, count) {
+		setting.gridShit = true;
+		for(var i = 0; i < count; i++) {
+			for(var j = 0; j < count; j++) {
+				objs.push({
+					x: i * 10,
+					y: j * 10,
+					mass: 1
+				});
+			}
+		}
+	}
+	
+	function orbitShit(objs, count) {
+		objs.push({x: 0, y: 0, mass: 60});
+		for(var i = 0; i < count; i++) {
+			objs.push({x: Math.sin(i) * 200, y: Math.cos(i) * 200, mass: 5, vel: {x: Math.sin(i + 2) * 2, y: Math.cos(i + 2) * 2}});
+		}
+	}
+	
+	function handleFocusOnClick(objs) {
+		grip.onclick = function(e) {
+			var x = e.clientX - cam.x + 42;
+			var y = e.clientY - cam.y - 109;
+			objs.some(function(o) {
+				if (Math.sqrt(Math.pow(x - o.x, 2) + Math.pow(y - o.y, 2)) < 10) {
+					cam.focus = o;
+					return true;
+				}
+			});
+		}
+	}
+	
+	function main() {
+		randomShit(objs, 500);
+	
+		changeSize(document.body.scrollWidth, document.body.scrollHeight);
+		handleFocusOnClick(objs);
+		
+		var firstRender = Date.now() + 5000;
+	
+		requestAnimationFrame(function next() {
+			checkCollision(objs);
+			gravity(objs);
+			executeForce(objs);
+			executeVelocity(objs);
+			spaceFriction(objs);
+			if(firstRender < Date.now()) focusBiggest(objs);
+			focus();
+			render(objs);
+
+			objs = objs.filter(function(o) {
+				return o.mass > 0;
+			});
+			
+			requestAnimationFrame(next);
+		});
+	}
+	
+	main();
+</script>
