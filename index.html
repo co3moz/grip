@@ -17,7 +17,7 @@
 	var ctx = grip.getContext('2d');
 	var w = grip.width;
 	var h = grip.height;
-	var cam = {x: w / 2, y:  h / 2 , focus: null};
+	var cam = {x: w / 2, y:  h / 2 , focus: null, move: {x: 0, y: 0}};
 	var lastRender = Date.now();
 	var objs = [];
 	
@@ -75,12 +75,17 @@
 		
 		ctx.fillText(Object.keys(setting).join(', '), 10, 25);
 
+		ctx.font = '19px monospace';
+		ctx.fillText('co3moz\'s Grip Universe', w - 250, h - 20);
+		
 		lastRender = Date.now();
 	}
 
 	function render(objs) {
 		objs.forEach(function(o) {
-			if(o.mass < 10) {
+			if(o.color) {
+				ctx.fillStyle = o.color;
+			} else if(o.mass < 10) {
 				ctx.fillStyle = 'white';
 			} else if(o.mass < 50) {
 				ctx.fillStyle = 'lime';
@@ -103,8 +108,18 @@
 			o.force = {x: 0, y:0};
 			objs.forEach(function(a) {
 				if(o == a) return;
+				if(o.mass >= a.mass) {
+					if (Math.pow(a.x - o.x, 2) + Math.pow(a.y - o.y, 2) < o.mass + a.mass) {
+						
+						o.vel.x = (o.vel.x * o.mass + a.vel.x * a.mass) / (o.mass + a.mass);
+						o.vel.y = (o.vel.y * o.mass + a.vel.y * a.mass) / (o.mass + a.mass);
+						
+						o.mass += a.mass;
+						a.mass = 0;
+					}
+				}
+				
 				var force = a.mass / (Math.pow(a.x - o.x, 2) + Math.pow(a.y - o.y, 2));
-				if(force > 0.1) force = 0.1; // safe limit
 				var forceX = force * Math.cos(Math.atan2(a.y - o.y, a.x - o.x));
 				var forceY = force * Math.sin(Math.atan2(a.y - o.y, a.x - o.x));
 				o.force.x += forceX;
@@ -141,24 +156,10 @@
 		});
 	}
 	
-	function checkCollision(objs) {
-		setting.checkCollision = true;
-		objs.forEach(function(o) {
-			objs.forEach(function(a) {
-				if(o == a) return;
-				if(o.mass < a.mass) return;
-				if (Math.pow(a.x - o.x, 2) + Math.pow(a.y - o.y, 2) < o.mass + a.mass) {
-					o.mass += a.mass;
-					a.mass = 0;
-				}
-			});
-		});
-	}
-	
 	function focus() {
 		if(cam.focus) {
-			cam.x = cam.focus.x;
-			cam.y = cam.focus.y;
+			cam.x += (cam.focus.x - cam.x) / 10;
+			cam.y += (cam.focus.y - cam.y) / 10;
 		}
 	}
 	
@@ -184,9 +185,10 @@
 	function randomShit(objs, count) {
 		for(var i = 0; i < count; i++) {
 			objs.push({
-				x: Math.random() * 1000 - 400,
-				y: Math.random() * 1000 - 400,
-				mass: Math.random() * 5 + 1
+				x: Math.random() * 1500 - 750,
+				y: Math.random() * 1500 - 750,
+				mass: Math.random() * 5 + 1,
+				force: {x: 0, y: 0}
 			});
 		}
 	}
@@ -226,7 +228,7 @@
 	}
 	
 	function main() {
-		randomShit(objs, 800);
+		randomShit(objs, 400);
 	
 		changeSize(document.body.scrollWidth, document.body.scrollHeight);
 		handleFocusOnClick(objs);
@@ -234,15 +236,14 @@
 		var firstRender = Date.now() + 10000;
 	
 		requestAnimationFrame(function next() {
-			//clearFirst();
-			checkCollision(objs);
+			clearFirst();
 			gravity(objs);
 			executeForce(objs);
 			executeVelocity(objs);
 			//spaceFriction(objs);
 			if (firstRender < Date.now()) {
 				focusRandom(objs);
-				firstRender = Date.now() + 1000;
+				firstRender = Date.now() + 5000;
 			}
 			focus();
 			renderGrid();
