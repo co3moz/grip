@@ -17,9 +17,11 @@
 	var ctx = grip.getContext('2d');
 	var w = grip.width;
 	var h = grip.height;
-	var cam = {x: w / 2, y:  h / 2 , focus: null, move: {x: 0, y: 0}};
+	var center = {x: w / 2, y: h / 2};
+	var cam = {x: 0, y: 0, focus: null, move: {x: 0, y: 0}};
 	var lastRender = Date.now();
 	var objs = [];
+	var mouse = {x: 0, y:0};
 	
 	var setting = {
 	
@@ -28,6 +30,8 @@
 	function changeSize(nw, nh) {
 		w = grip.width = nw;
 		h = grip.height = nh;
+		
+		center = {x: w / 2, y: h / 2};
 	}
 	
 	function clearFirst() {
@@ -69,7 +73,7 @@
 		if (cam.focus) {
 			ctx.fillText("Grip Universe - total:" + objs.length + ", fps:" + (1000 / (Date.now() - lastRender)).toFixed(0) +", cam:{x:" + cam.x.toFixed(0) + ", y:" + cam.y.toFixed(0) + ", mass:" + cam.focus.mass.toFixed(0) + ", vel: {x:" + cam.focus.vel.x.toFixed(2) +", y:" + cam.focus.vel.y.toFixed(2) +"}, force: {x:" + cam.focus.force.x.toExponential(3) +", y:" + cam.focus.force.y.toExponential(3) +"}}", 10, 10);
 		} else {
-			ctx.fillText("Grip Universe - total:" + objs.length + ", fps:" + (1000 / (Date.now() - lastRender)).toFixed(0) +", cam:{x:" + cam.x.toFixed(0) + ", y:" + cam.y.toFixed(0) + "}", 10, 10);
+			ctx.fillText("Grip Universe - total:" + objs.length + ", fps:" + (1000 / (Date.now() - lastRender)).toFixed(0) +", cam:{x:" + cam.x.toFixed(0) + ", y:" + cam.y.toFixed(0) + "}, mouse:{x:" + mouse.x.toFixed(0) + ", y:" + mouse.y.toFixed(0) + "}", 10, 10);
 		}
 		
 		
@@ -83,6 +87,9 @@
 
 	function render(objs) {
 		objs.forEach(function(o) {
+			var x = o.x - cam.x + center.x;
+			var y = o.y - cam.y + center.y;
+						
 			if(o.color) {
 				ctx.fillStyle = o.color;
 			} else if(o.mass < 10) {
@@ -97,8 +104,14 @@
 				ctx.fillStyle = 'darkred';
 			}
 			ctx.beginPath();
-			ctx.arc((o.x - cam.x + w / 2), (o.y - cam.y + h / 2), Math.sqrt(o.mass), 0, 2 * Math.PI);
+			ctx.arc(x, y, Math.sqrt(o.mass), 0, 2 * Math.PI);
 			ctx.fill();
+			
+			ctx.font = '10px monospace';
+			ctx.fillStyle = 'lime';
+			var text = o.x.toFixed(0) + " " + o.y.toFixed(0) + " " + o.mass.toFixed(0);
+			
+			ctx.fillText(text, x - ctx.measureText(text).width / 2, y - Math.sqrt(o.mass) - 5);
 		});
 	}
 	
@@ -116,6 +129,10 @@
 						
 						o.mass += a.mass;
 						a.mass = 0;
+						
+						if(cam.focus == a) {
+							cam.focus = o;
+						}
 					}
 				}
 				
@@ -131,10 +148,6 @@
 	function executeForce(objs) {
 		setting.executeForce = true;
 		objs.forEach(function(o) {
-			if (!o.vel) {
-				o.vel = {x: 0, y: 0};
-			}
-			
 			o.vel.x += o.force.x;
 			o.vel.y += o.force.y;
 		});
@@ -145,14 +158,6 @@
 		objs.forEach(function(o) {
 			o.x += o.vel.x;
 			o.y += o.vel.y;
-		});
-	}
-	
-	function spaceFriction(objs) { // yeah. :D
-		setting.spaceFriction = true;
-		objs.forEach(function(o) {
-			o.vel.x *= 0.99;
-			o.vel.y *= 0.99;
 		});
 	}
 	
@@ -215,33 +220,39 @@
 		}
 	}
 	
-	function handleFocusOnClick(objs) {
+	function handleFocusOnClick() {
 		grip.onclick = function(e) {
-			var x = e.clientX - cam.x + 42;
-			var y = e.clientY - cam.y - 109;
+			var x = cam.x + e.clientX - center.x;
+			var y = cam.y - center.y + e.clientY;
 			objs.some(function(o) {
-				if (Math.sqrt(Math.pow(x - o.x, 2) + Math.pow(y - o.y, 2)) < 10) {
+				if (Math.sqrt(Math.pow(x - o.x, 2) + Math.pow(y - o.y, 2)) < Math.max(Math.sqrt(o.mass), 10)) {
 					cam.focus = o;
 					return true;
 				}
+				e;
 			});
+		}
+		
+		grip.onmousemove = function(e) {
+			mouse.x = e.clientX - center.x;
+			mouse.y = center.y - e.clientY;
 		}
 	}
 	
 	function main() {
 		randomShit(objs, 400);
+		
 	
 		changeSize(document.body.scrollWidth, document.body.scrollHeight);
-		handleFocusOnClick(objs);
+		handleFocusOnClick();
 		
-		var firstRender = Date.now() + 10000;
+		var firstRender = Date.now() + 5000;
 	
 		requestAnimationFrame(function next() {
 			clearFirst();
 			gravity(objs);
 			executeForce(objs);
 			executeVelocity(objs);
-			//spaceFriction(objs);
 			if (firstRender < Date.now()) {
 				focusRandom(objs);
 				firstRender = Date.now() + 5000;
